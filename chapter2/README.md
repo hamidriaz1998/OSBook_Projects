@@ -1,6 +1,6 @@
-# Chapter 2 - Linux Kernel Modules
+# Chapter 2 - Operating System Concepts Book (10th edition) - Programming Projects
 
-This directory contains two Linux kernel modules demonstrating basic kernel programming concepts.
+This directory contains four Linux kernel modules demonstrating basic kernel programming concepts.
 
 ## Modules Overview
 
@@ -36,6 +36,36 @@ A simple kernel module that demonstrates:
 - Calculates GCD of two numbers (3300 and 24)
 - Reports total time module was loaded
 
+### 3. jiffies_mod.c - Current Jiffies /proc Module
+
+A kernel module that creates a `/proc/jiffies` entry to display current kernel timing information:
+
+- Real-time access to kernel timer tick counter
+- Demonstrates dynamic `/proc` content that changes on each read
+- Shows current system state through `/proc` interface
+
+**Features:**
+
+- Creates `/proc/jiffies` entry when loaded
+- Returns current jiffies value each time it's read
+- Shows real-time kernel timer ticks
+
+### 4. time_elapsed.c - Elapsed Time Tracking Module
+
+A comprehensive timing module that creates a `/proc/seconds` entry showing detailed timing information:
+
+- Tracks module load time and calculates elapsed time
+- Demonstrates time conversion (jiffies to seconds/milliseconds)
+- Shows multiple time representations in a single read
+
+**Features:**
+
+- Creates `/proc/seconds` entry when loaded
+- Shows initial jiffies value when module was loaded
+- Displays current jiffies and elapsed jiffies
+- Converts elapsed time to both seconds and milliseconds
+- Provides comprehensive timing analysis
+
 ## Building the Modules
 
 ### Prerequisites
@@ -48,10 +78,13 @@ A simple kernel module that demonstrates:
 To build a specific module, edit the first line of `Makefile`:
 
 ```makefile
-obj-m += hello.o        # For hello module
-# or
-obj-m += simple.o       # For simple module
+obj-m += hello.o         # For hello module
+obj-m += simple.o        # For simple module
+obj-m += jiffies_mod.o   # For jiffies module
+obj-m += time_elapsed.o  # For time elapsed module
 ```
+
+**Note:** Only uncomment one line at a time to build individual modules.
 
 Then run:
 
@@ -117,6 +150,51 @@ Total timer interrupts since loading module: [difference]
 Total time elapsed since loading module (in seconds): [time]
 ```
 
+### jiffies_mod.c Module
+
+```bash
+# Load the module
+sudo insmod jiffies_mod.ko
+
+# Read current jiffies (will show different values each time)
+cat /proc/jiffies
+# Output: The current jiffies value is: [current_value]
+
+# Read again to see the value change
+cat /proc/jiffies
+# Output: The current jiffies value is: [different_value]
+
+# Unload the module
+sudo rmmod jiffies_mod
+```
+
+### time_elapsed.c Module
+
+```bash
+# Load the module
+sudo insmod time_elapsed.ko
+
+# Read timing information immediately after loading
+cat /proc/seconds
+# Output:
+# Module loaded at jiffies: [init_value]
+# Current jiffies: [current_value]
+# Elapsed jiffies: [small_difference]
+# Elapsed time: 0 seconds ([milliseconds] ms)
+
+# Wait a few seconds and read again
+sleep 5
+cat /proc/seconds
+# Output:
+# Module loaded at jiffies: [init_value]
+# Current jiffies: [current_value]
+# Elapsed jiffies: [larger_difference]
+# Elapsed time: 5 seconds ([milliseconds] ms)
+
+# Unload the module
+sudo rmmod time_elapsed
+```
+
 ## Key Learning Points
 
 ### Modern Kernel Development
@@ -127,10 +205,13 @@ Total time elapsed since loading module (in seconds): [time]
 
 ### Kernel Programming Concepts
 
-- **jiffies**: Kernel's global timer tick counter
-- **HZ**: System timer frequency (ticks per second)
+- **jiffies**: Kernel's global timer tick counter that increments with each timer interrupt
+- **HZ**: System timer frequency (ticks per second) - typically 250, 1000, or 1024 Hz
 - **printk()**: Kernel's equivalent to printf() for logging
 - **KERN_INFO**: Log level for informational messages
+- **snprintf()**: Safe string formatting function for kernel space
+- **Dynamic /proc content**: Files that show different content on each read
+- **Time conversion**: Converting between jiffies, seconds, and milliseconds
 
 ### Memory Management
 
@@ -142,17 +223,23 @@ Total time elapsed since loading module (in seconds): [time]
 
 ### Common Issues
 
-1. **Empty output from `/proc/hello`**:
+1. **Empty output from `/proc/hello`, `/proc/jiffies`, or `/proc/seconds`**:
    - Ensure using `struct proc_ops` not `struct file_operations`
    - Check that `.proc_read` is used instead of `.read`
+   - Verify completion flag logic is correct
 
 2. **Module won't load**:
    - Check kernel log: `dmesg | tail`
    - Verify kernel headers match running kernel: `uname -r`
+   - Ensure no conflicting `/proc` entries exist
 
 3. **Permission denied**:
    - Use `sudo` for insmod/rmmod operations
    - Check if another module with same name is loaded: `lsmod | grep module_name`
+
+4. **Timing values seem incorrect**:
+   - Check system's HZ value: `grep 'CONFIG_HZ=' /boot/config-$(uname -r)`
+   - Verify jiffies calculations for your system's timer frequency
 
 ### Debugging Tips
 
@@ -168,5 +255,8 @@ Total time elapsed since loading module (in seconds): [time]
 make clean
 
 # Remove any loaded modules
-sudo rmmod hello simple 2>/dev/null || true
+sudo rmmod hello simple jiffies_mod time_elapsed 2>/dev/null || true
+
+# Verify all proc entries are removed
+ls -la /proc/{hello,jiffies,seconds} 2>/dev/null || echo "All proc entries cleaned up"
 ```
