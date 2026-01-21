@@ -11,6 +11,7 @@ int parse_input(char *input_buffer, char *args[]);
 
 int main() {
   char input_buffer[BUFFER_LENGTH];
+  char last_command_buffer[BUFFER_LENGTH] = {0};
   bool should_run = 1;
   char *args[MAXLINE + 1];
 
@@ -44,6 +45,21 @@ int main() {
       fflush(stdout);
       continue;
     }
+    
+    // Run last command
+    if (strcmp(input_buffer, "!!") == 0){
+        if (last_command_buffer[0] == 0) {
+          printf("Error: No commands in history.\n");
+          continue;
+        } else {
+          strcpy(input_buffer, last_command_buffer);
+          printf("Running command: %s\n", last_command_buffer);
+        }
+    }
+
+    // Save the command to last_command_buffer before parsing
+    memset(last_command_buffer, 0, sizeof(last_command_buffer));
+    strcpy(last_command_buffer, input_buffer);
 
     int args_length = parse_input(input_buffer, args);
 
