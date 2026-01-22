@@ -20,7 +20,11 @@ void debug_command(struct Command *cmd) {
   printf("DEBUG: Num of pipes: %d\n", cmd->num_pipes);
   printf("DEBUG: Pipe command count: %d\n", cmd->pipe_cmd_count);
   for (int i = 0; i < cmd->pipe_cmd_count; i++) {
-    printf("DEBUG: pipe_cmds[%d]: %s\n", i, *cmd->pipe_cmds[i]);
+    printf("DEBUG: pipe_cmds[%d] full command: ", i);
+    for (int j = 0; cmd->pipe_cmds[i][j] != NULL; j++) {
+      printf("%s ", cmd->pipe_cmds[i][j]);
+    }
+    printf("\n");
   }
 }
 #endif
@@ -156,22 +160,19 @@ int execute_command(struct Command *cmd) {
         close(pipes[j][WRITE_END]);
       }
 
-      execvp(cmd->pipe_cmds[i][0], cmd->pipe_cmds[0]);
+      execvp(cmd->pipe_cmds[i][0], cmd->pipe_cmds[i]);
       exit(1);
-    } else {
-      // parent process
-
-      // Close all pipes
-      for (int j = 0; j < cmd->num_pipes; j++) {
-        close(pipes[j][READ_END]);
-        close(pipes[j][WRITE_END]);
-      }
-      
-      if (!cmd->run_background) {
-        for (int i = 0; i < cmd->pipe_cmd_count; i++)
-          wait(NULL);
-      }
     }
+  }
+  // Close all pipes
+  for (int j = 0; j < cmd->num_pipes; j++) {
+    close(pipes[j][READ_END]);
+    close(pipes[j][WRITE_END]);
+  }
+
+  if (!cmd->run_background) {
+    for (int i = 0; i < cmd->pipe_cmd_count; i++)
+      wait(NULL);
   }
   return 0;
 }
