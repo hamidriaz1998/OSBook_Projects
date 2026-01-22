@@ -2,8 +2,8 @@
 
 int main() {
   bool should_run = 1;
-  struct Command cmd = {{0},   {0},  {0},   false, false,
-                        false, NULL, false, NULL,  false};
+  struct Command cmd = {{0},  {0},   {0},  false, false, false,
+                        NULL, false, NULL, false, {0},   0};
 
   while (should_run) {
     printf("osh> ");
@@ -52,14 +52,14 @@ int main() {
     strcpy(cmd.last_command_buf, cmd.input_buf);
 
     tokenize_input(&cmd);
-    parse_input(&cmd);
+    if (parse_input(&cmd) == -1) {
+      continue;
+    }
 
 #ifdef DEBUG
     debug_command(&cmd);
 #endif
-
     execute_command(&cmd);
-
     reset_command(&cmd);
   }
 }

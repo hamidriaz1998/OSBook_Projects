@@ -10,16 +10,22 @@
 #define BUFFER_LENGTH 256
 
 struct Command {
+  ////////// INPUT //////////
   char input_buf[BUFFER_LENGTH];
   char last_command_buf[BUFFER_LENGTH];
-  char *args[MAXLINE + 1];
+  ////////// ARGS //////////
+  char *args[MAXLINE];
   int args_length;
   bool run_background;
+  ////////// REDIRECTS //////////
   bool redirect_out;
   char *redirect_out_file;
   bool redirect_in;
   char *redirect_in_file;
-  bool has_pipe;
+  ////////// PIPE //////////
+  int num_pipes;
+  char **pipe_cmds[MAXLINE];
+  int pipe_cmd_count;
 };
 
 #ifdef DEBUG

@@ -14,7 +14,11 @@ void debug_command(struct Command *cmd) {
   printf("DEBUG: Redirect Out: %s\n", cmd->redirect_out ? "yes" : "no");
   printf("DEBUG: Redirect Out File: %s\n",
          cmd->redirect_out_file ? cmd->redirect_out_file : "none");
-  printf("DEBUG: Pipe: %s\n", cmd->has_pipe ? "yes" : "no");
+  printf("DEBUG: Num of pipes: %d\n", cmd->num_pipes);
+  printf("DEBUG: Pipe command count: %d\n", cmd->pipe_cmd_count);
+  for (int i = 0; i < cmd->pipe_cmd_count; i++) {
+    printf("DEBUG: pipe_cmds[%d]: %s\n", i, *cmd->pipe_cmds[i]);
+  }
 }
 #endif
 
@@ -45,6 +49,9 @@ int parse_input(struct Command *cmd) {
   }
 
   if (cmd->args_length > 0) {
+    // Add first command to pipe_cmds array
+    cmd->pipe_cmds[0] = &cmd->args[0];
+    cmd->pipe_cmd_count++;
     // Check if args contains "<" or ">" for input/output redirection
     for (int i = 0; i < cmd->args_length; i++) {
 
@@ -82,6 +89,15 @@ int parse_input(struct Command *cmd) {
     }
     cmd->args[write_idx] = NULL;
     cmd->args_length = write_idx;
+
+    // Replace "|" with NULL
+    for (int i = 0; i < cmd->args_length; i++) {
+      if (strcmp(cmd->args[i], "|") == 0) {
+        cmd->pipe_cmds[cmd->pipe_cmd_count++] = &cmd->args[i + 1];
+        cmd->args[i] = NULL;
+        cmd->num_pipes++;
+      }
+    }
   }
   return 0;
 }
@@ -132,5 +148,8 @@ void reset_command(struct Command *cmd) {
   cmd->redirect_out = false;
   cmd->redirect_out_file = NULL;
   cmd->run_background = false;
+  cmd->pipe_cmd_count = 0;
+  cmd->num_pipes = 0;
+  memset(cmd->pipe_cmds, 0, sizeof(cmd->pipe_cmds));
   memset(cmd->input_buf, 0, sizeof(cmd->input_buf));
 }
