@@ -46,7 +46,7 @@ $(BIN_DIR):
 
 # Clean build artifacts
 clean:
-	rm -rf $(OBJ_DIR) $(BIN_DIR)
+	rm -rf $(OBJ_DIR) $(BIN_DIR) *.txt
 
 # Remove all generated files including test files
 distclean: clean

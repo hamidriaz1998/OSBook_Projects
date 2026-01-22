@@ -55,19 +55,7 @@ int main() {
     parse_input(&cmd);
 
 #ifdef DEBUG
-    // Print contents of args array
-    printf("DEBUG: Arguments:\n");
-    for (int i = 0; i < cmd.args_length; i++) {
-      printf("DEBUG: args[%d]: %s\n", i, cmd.args[i]);
-    }
-    printf("DEBUG: Background: %s\n", cmd.run_background ? "yes" : "no");
-    printf("DEBUG: Redirect In: %s\n", cmd.redirect_in ? "yes" : "no");
-    printf("DEBUG: Redirect In File: %s\n",
-           cmd.redirect_in_file ? cmd.redirect_in_file : "none");
-    printf("DEBUG: Redirect Out: %s\n", cmd.redirect_out ? "yes" : "no");
-    printf("DEBUG: Redirect Out File: %s\n",
-           cmd.redirect_out_file ? cmd.redirect_out_file : "none");
-    printf("DEBUG: Pipe: %s\n", cmd.has_pipe ? "yes" : "no");
+    debug_command(&cmd);
 #endif
 
     execute_command(&cmd);

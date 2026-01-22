@@ -22,6 +22,10 @@ struct Command {
   bool has_pipe;
 };
 
+#ifdef DEBUG
+void debug_command(struct Command *cmd);
+#endif
+
 int tokenize_input(struct Command *cmd);
 int parse_input(struct Command *cmd);
 int execute_command(struct Command *cmd);
