@@ -7,106 +7,183 @@
 #define MAXLINE 80
 #define BUFFER_LENGTH 256
 
-int parse_input(char *input_buffer, char *args[]);
+struct Command {
+  char input_buf[BUFFER_LENGTH];
+  char last_command_buf[BUFFER_LENGTH];
+  char *args[MAXLINE + 1];
+  int args_length;
+  bool run_background;
+  bool redirect_out;
+  char *redirect_out_file;
+  bool redirect_in;
+  char *redirect_in_file;
+  bool has_pipe;
+};
+
+int tokenize_input(struct Command *cmd);
+int parse_input(struct Command *cmd);
+int execute_command(struct Command *cmd);
 
 int main() {
-  char input_buffer[BUFFER_LENGTH];
-  char last_command_buffer[BUFFER_LENGTH] = {0};
   bool should_run = 1;
-  char *args[MAXLINE + 1];
+  struct Command cmd = {{0},   {0},  {0},   false, false,
+                        false, NULL, false, NULL,  false};
 
   while (should_run) {
     printf("osh> ");
     fflush(stdout);
-    if (fgets(input_buffer, sizeof(input_buffer), stdin) == NULL) {
+    if (fgets(cmd.input_buf, sizeof(cmd.input_buf), stdin) == NULL) {
       printf("Error: Invalid Input");
       continue;
     } else {
-      size_t length = strlen(input_buffer);
+      size_t length = strlen(cmd.input_buf);
       // Check for empty input
-      if (length == 1 && input_buffer[0] == '\n') {
+      if (length == 1 && cmd.input_buf[0] == '\n') {
         printf("Error: Invalid Input\n");
         continue;
       }
       // Remove trailing \n
-      if (length > 0 && input_buffer[length - 1] == '\n') {
-        input_buffer[length - 1] = '\0';
+      if (length > 0 && cmd.input_buf[length - 1] == '\n') {
+        cmd.input_buf[length - 1] = '\0';
       }
     }
 
-    if (strcmp(input_buffer, "exit") == 0) {
+    if (strcmp(cmd.input_buf, "exit") == 0) {
       should_run = false;
       continue;
     }
 
     // Handle clear command
-    if (strcmp(input_buffer, "clear") == 0) {
+    if (strcmp(cmd.input_buf, "clear") == 0) {
       printf("\033[H\033[J");
       fflush(stdout);
       continue;
     }
-    
+
     // Run last command
-    if (strcmp(input_buffer, "!!") == 0){
-        if (last_command_buffer[0] == 0) {
-          printf("Error: No commands in history.\n");
-          continue;
-        } else {
-          strcpy(input_buffer, last_command_buffer);
-          printf("Running command: %s\n", last_command_buffer);
-        }
+    if (strcmp(cmd.input_buf, "!!") == 0) {
+      if (cmd.last_command_buf[0] == 0) {
+        printf("Error: No commands in history.\n");
+        continue;
+      } else {
+        strcpy(cmd.input_buf, cmd.last_command_buf);
+        printf("Running command: %s\n", cmd.last_command_buf);
+      }
     }
 
-    // Save the command to last_command_buffer before parsing
-    memset(last_command_buffer, 0, sizeof(last_command_buffer));
-    strcpy(last_command_buffer, input_buffer);
+    // Save the command to cmd.last_command_buf before parsing
+    memset(cmd.last_command_buf, 0, sizeof(cmd.last_command_buf));
+    strcpy(cmd.last_command_buf, cmd.input_buf);
 
-    int args_length = parse_input(input_buffer, args);
-
-    // Check if last argument is "&" for background execution
-    bool run_background = false;
-    if (args_length > 0 && strcmp(args[args_length - 1], "&") == 0) {
-      run_background = true;
-      args[args_length - 1] = NULL;
-      args_length--;
-    }
+    tokenize_input(&cmd);
+    parse_input(&cmd);
 
 #ifdef DEBUG
     // Print contents of args array
     printf("DEBUG: Arguments:\n");
-    for (int i = 0; i < args_length; i++) {
-      printf("DEBUG: args[%d]: %s\n", i, args[i]);
+    for (int i = 0; i < cmd.args_length; i++) {
+      printf("DEBUG: args[%d]: %s\n", i, cmd.args[i]);
     }
-    printf("DEBUG: Background: %s\n", run_background ? "yes" : "no");
+    printf("DEBUG: Background: %s\n", cmd.run_background ? "yes" : "no");
+    printf("DEBUG: Redirect In: %s\n", cmd.redirect_in ? "yes" : "no");
+    printf("DEBUG: Redirect In File: %s\n",
+           cmd.redirect_in_file ? cmd.redirect_in_file : "none");
+    printf("DEBUG: Redirect Out: %s\n", cmd.redirect_out ? "yes" : "no");
+    printf("DEBUG: Redirect Out File: %s\n",
+           cmd.redirect_out_file ? cmd.redirect_out_file : "none");
+    printf("DEBUG: Pipe: %s\n", cmd.has_pipe ? "yes" : "no");
 #endif
 
-    if (fork() == 0) {
-      // child process
-      execvp(args[0], args);
-    } else {
-      if (!run_background) {
-        wait(NULL);
-      }
-    }
+    execute_command(&cmd);
 
-    // clear input_buffer
-    memset(input_buffer, 0, sizeof(input_buffer));
+    // clear cmd.input_buf
+    memset(cmd.input_buf, 0, sizeof(cmd.input_buf));
   }
 }
 
-int parse_input(char *input_buffer, char *args[]) {
+int tokenize_input(struct Command *cmd) {
   char *token;
-  token = strtok(input_buffer, " ");
+  token = strtok(cmd->input_buf, " ");
   int i = 0;
-
   while (token != NULL) {
 #ifdef DEBUG
     printf("DEBUG: Token: %s\n", token);
 #endif
-    args[i++] = token;
+    cmd->args[i++] = token;
     token = strtok(NULL, " ");
   }
 
-  args[i] = NULL;
+  cmd->args[i] = NULL;
+  cmd->args_length = i;
   return i;
+}
+
+int parse_input(struct Command *cmd) {
+  // Check if last argument is "&" for background execution
+  if (cmd->args_length > 0 &&
+      strcmp(cmd->args[cmd->args_length - 1], "&") == 0) {
+    cmd->run_background = true;
+    cmd->args[cmd->args_length - 1] = NULL;
+    cmd->args_length--;
+  }
+
+  if (cmd->args_length > 0) {
+    // Check if args contains "<" or ">" for input/output redirection
+    for (int i = 0; i < cmd->args_length; i++) {
+
+      if (cmd->args[i] == NULL)
+        continue;
+
+      if (!cmd->redirect_in && strcmp(cmd->args[i], "<") == 0) {
+        if (i + 1 >= cmd->args_length || cmd->args[i + 1] == NULL) {
+          printf("Error: No input file specified for redirection\n");
+          return -1;
+        }
+        cmd->redirect_in = true;
+        cmd->redirect_in_file = cmd->args[i + 1];
+        cmd->args[i] = NULL;
+        cmd->args[i + 1] = NULL;
+
+      } else if (!cmd->redirect_out && strcmp(cmd->args[i], ">") == 0) {
+        if (i + 1 >= cmd->args_length || cmd->args[i + 1] == NULL) {
+          printf("Error: No output file specified for redirection\n");
+          return -1;
+        }
+        cmd->redirect_out = true;
+        cmd->redirect_out_file = cmd->args[i + 1];
+        cmd->args[i] = NULL;
+        cmd->args[i + 1] = NULL;
+      }
+    }
+
+    // Compact the args array by removing NULLs
+    int write_idx = 0;
+    for (int read_idx = 0; read_idx < cmd->args_length; read_idx++) {
+      if (cmd->args[read_idx] != NULL) {
+        cmd->args[write_idx++] = cmd->args[read_idx];
+      }
+    }
+    cmd->args[write_idx] = NULL;
+    cmd->args_length = write_idx;
+  }
+  return 0;
+}
+
+int execute_command(struct Command *cmd) {
+  pid_t pid = fork();
+  if (pid == -1) {
+    perror("fork");
+    return -1;
+  }
+
+  if (pid == 0) {
+    // child process
+    execvp(cmd->args[0], cmd->args);
+  } else {
+    // parent process
+    if (!cmd->run_background) {
+      wait(NULL);
+    }
+  }
+  return 0;
 }
