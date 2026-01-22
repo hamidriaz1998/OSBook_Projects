@@ -1,4 +1,7 @@
 #include "shell.h"
+#include <unistd.h>
+#define READ_END 0
+#define WRITE_END 1
 
 #ifdef DEBUG
 void debug_command(struct Command *cmd) {
@@ -90,7 +93,7 @@ int parse_input(struct Command *cmd) {
     cmd->args[write_idx] = NULL;
     cmd->args_length = write_idx;
 
-    // Replace "|" with NULL
+    // Parse pipes
     for (int i = 0; i < cmd->args_length; i++) {
       if (strcmp(cmd->args[i], "|") == 0) {
         cmd->pipe_cmds[cmd->pipe_cmd_count++] = &cmd->args[i + 1];
@@ -103,38 +106,71 @@ int parse_input(struct Command *cmd) {
 }
 
 int execute_command(struct Command *cmd) {
-  pid_t pid = fork();
-  if (pid == -1) {
-    perror("fork");
-    return -1;
+  int pipes[cmd->num_pipes][2];
+  for (int i = 0; i < cmd->num_pipes; i++) {
+    if (pipe(pipes[i]) == -1) {
+      perror("Pipe");
+      return -1;
+    }
   }
-
-  if (pid == 0) {
-    // child process
-    if (cmd->redirect_in) {
-      int fd = open(cmd->redirect_in_file, O_RDONLY);
-      if (fd == -1) {
-        perror("open");
-        exit(EXIT_FAILURE);
-      }
-      dup2(fd, STDIN_FILENO);
-      close(fd);
+  for (int i = 0; i < cmd->pipe_cmd_count; i++) {
+    pid_t pid = fork();
+    if (pid == -1) {
+      perror("fork");
+      return -1;
     }
 
-    if (cmd->redirect_out) {
-      int fd = open(cmd->redirect_out_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
-      if (fd == -1) {
-        perror("open");
-        exit(EXIT_FAILURE);
+    if (pid == 0) {
+      // child process
+
+      // Only first command can have a input redirect "<"
+      if (i == 0 && cmd->redirect_in) {
+        int fd = open(cmd->redirect_in_file, O_RDONLY);
+        if (fd == -1) {
+          perror("open");
+          exit(EXIT_FAILURE);
+        }
+        dup2(fd, STDIN_FILENO);
+        close(fd);
+      } else if (i > 0) {
+        dup2(pipes[i - 1][READ_END], STDIN_FILENO);
       }
-      dup2(fd, STDOUT_FILENO);
-      close(fd);
-    }
-    execvp(cmd->args[0], cmd->args);
-  } else {
-    // parent process
-    if (!cmd->run_background) {
-      wait(NULL);
+
+      // Only last command can have a output redirect ">"
+      if (i == cmd->pipe_cmd_count - 1 && cmd->redirect_out) {
+        int fd =
+            open(cmd->redirect_out_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+        if (fd == -1) {
+          perror("open");
+          exit(EXIT_FAILURE);
+        }
+        dup2(fd, STDOUT_FILENO);
+        close(fd);
+      } else if (i < cmd->pipe_cmd_count - 1) {
+        dup2(pipes[i][WRITE_END], STDOUT_FILENO);
+      }
+
+      // Close all pipes
+      for (int j = 0; j < cmd->num_pipes; j++) {
+        close(pipes[j][READ_END]);
+        close(pipes[j][WRITE_END]);
+      }
+
+      execvp(cmd->pipe_cmds[i][0], cmd->pipe_cmds[0]);
+      exit(1);
+    } else {
+      // parent process
+
+      // Close all pipes
+      for (int j = 0; j < cmd->num_pipes; j++) {
+        close(pipes[j][READ_END]);
+        close(pipes[j][WRITE_END]);
+      }
+      
+      if (!cmd->run_background) {
+        for (int i = 0; i < cmd->pipe_cmd_count; i++)
+          wait(NULL);
+      }
     }
   }
   return 0;
