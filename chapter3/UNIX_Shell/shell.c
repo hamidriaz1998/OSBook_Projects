@@ -1,105 +1,4 @@
-#include <stdbool.h>
-#include <stdio.h>
-#include <string.h>
-#include <sys/wait.h>
-#include <unistd.h>
-
-#define MAXLINE 80
-#define BUFFER_LENGTH 256
-
-struct Command {
-  char input_buf[BUFFER_LENGTH];
-  char last_command_buf[BUFFER_LENGTH];
-  char *args[MAXLINE + 1];
-  int args_length;
-  bool run_background;
-  bool redirect_out;
-  char *redirect_out_file;
-  bool redirect_in;
-  char *redirect_in_file;
-  bool has_pipe;
-};
-
-int tokenize_input(struct Command *cmd);
-int parse_input(struct Command *cmd);
-int execute_command(struct Command *cmd);
-
-int main() {
-  bool should_run = 1;
-  struct Command cmd = {{0},   {0},  {0},   false, false,
-                        false, NULL, false, NULL,  false};
-
-  while (should_run) {
-    printf("osh> ");
-    fflush(stdout);
-    if (fgets(cmd.input_buf, sizeof(cmd.input_buf), stdin) == NULL) {
-      printf("Error: Invalid Input");
-      continue;
-    } else {
-      size_t length = strlen(cmd.input_buf);
-      // Check for empty input
-      if (length == 1 && cmd.input_buf[0] == '\n') {
-        printf("Error: Invalid Input\n");
-        continue;
-      }
-      // Remove trailing \n
-      if (length > 0 && cmd.input_buf[length - 1] == '\n') {
-        cmd.input_buf[length - 1] = '\0';
-      }
-    }
-
-    if (strcmp(cmd.input_buf, "exit") == 0) {
-      should_run = false;
-      continue;
-    }
-
-    // Handle clear command
-    if (strcmp(cmd.input_buf, "clear") == 0) {
-      printf("\033[H\033[J");
-      fflush(stdout);
-      continue;
-    }
-
-    // Run last command
-    if (strcmp(cmd.input_buf, "!!") == 0) {
-      if (cmd.last_command_buf[0] == 0) {
-        printf("Error: No commands in history.\n");
-        continue;
-      } else {
-        strcpy(cmd.input_buf, cmd.last_command_buf);
-        printf("Running command: %s\n", cmd.last_command_buf);
-      }
-    }
-
-    // Save the command to cmd.last_command_buf before parsing
-    memset(cmd.last_command_buf, 0, sizeof(cmd.last_command_buf));
-    strcpy(cmd.last_command_buf, cmd.input_buf);
-
-    tokenize_input(&cmd);
-    parse_input(&cmd);
-
-#ifdef DEBUG
-    // Print contents of args array
-    printf("DEBUG: Arguments:\n");
-    for (int i = 0; i < cmd.args_length; i++) {
-      printf("DEBUG: args[%d]: %s\n", i, cmd.args[i]);
-    }
-    printf("DEBUG: Background: %s\n", cmd.run_background ? "yes" : "no");
-    printf("DEBUG: Redirect In: %s\n", cmd.redirect_in ? "yes" : "no");
-    printf("DEBUG: Redirect In File: %s\n",
-           cmd.redirect_in_file ? cmd.redirect_in_file : "none");
-    printf("DEBUG: Redirect Out: %s\n", cmd.redirect_out ? "yes" : "no");
-    printf("DEBUG: Redirect Out File: %s\n",
-           cmd.redirect_out_file ? cmd.redirect_out_file : "none");
-    printf("DEBUG: Pipe: %s\n", cmd.has_pipe ? "yes" : "no");
-#endif
-
-    execute_command(&cmd);
-
-    // clear cmd.input_buf
-    memset(cmd.input_buf, 0, sizeof(cmd.input_buf));
-  }
-}
+#include "shell.h"
 
 int tokenize_input(struct Command *cmd) {
   char *token;
@@ -178,6 +77,25 @@ int execute_command(struct Command *cmd) {
 
   if (pid == 0) {
     // child process
+    if (cmd->redirect_in) {
+      int fd = open(cmd->redirect_in_file, O_RDONLY);
+      if (fd == -1) {
+        perror("open");
+        exit(EXIT_FAILURE);
+      }
+      dup2(fd, STDIN_FILENO);
+      close(fd);
+    }
+
+    if (cmd->redirect_out) {
+      int fd = open(cmd->redirect_out_file, O_WRONLY | O_CREAT | O_TRUNC, 0644);
+      if (fd == -1) {
+        perror("open");
+        exit(EXIT_FAILURE);
+      }
+      dup2(fd, STDOUT_FILENO);
+      close(fd);
+    }
     execvp(cmd->args[0], cmd->args);
   } else {
     // parent process
@@ -186,4 +104,15 @@ int execute_command(struct Command *cmd) {
     }
   }
   return 0;
+}
+
+void reset_command(struct Command *cmd) {
+  cmd->args_length = 0;
+  cmd->args[0] = NULL;
+  cmd->redirect_in = false;
+  cmd->redirect_in_file = NULL;
+  cmd->redirect_out = false;
+  cmd->redirect_out_file = NULL;
+  cmd->run_background = false;
+  memset(cmd->input_buf, 0, sizeof(cmd->input_buf));
 }
