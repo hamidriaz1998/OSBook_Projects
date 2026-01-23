@@ -22,13 +22,30 @@ A custom Unix shell implementation written in C, featuring command execution, I/
   - Output redirection using `>`
 - **Piping**: Support for multiple pipes to chain commands
 - **Background Processes**: Run commands in the background using `&`
-- **Command History**: Recall the last executed command with `!!`
+- **Command History**:
+  - Persistent history saved to `~/.osh_history`
+  - Navigate history with arrow keys (↑/↓)
+  - Up to 500 commands stored
+  - Recall last command with `!!`
 - **Built-in Commands**:
   - `exit` - Exit the shell
   - `clear` - Clear the terminal screen
 
 ### Advanced Features
 
+- **Command Line Editing** (powered by linenoise):
+  - Arrow keys (←/→) for cursor movement
+  - Arrow keys (↑/↓) for history navigation
+  - **Ctrl+A** - Jump to beginning of line
+  - **Ctrl+E** - Jump to end of line
+  - **Ctrl+L** - Clear screen
+  - **Ctrl+K** - Delete from cursor to end
+  - **Ctrl+U** - Delete entire line
+  - **Ctrl+W** - Delete word backward
+  - **Ctrl+D** - Exit shell (EOF)
+  - **Ctrl+C** - Cancel current input
+  - **Home/End** - Beginning/end of line
+  - **Backspace/Delete** - Character deletion
 - Multiple pipe support (e.g., `cmd1 | cmd2 | cmd3`)
 - Combined I/O redirection with pipes
 - Quoted string support (single and double quotes)
@@ -42,6 +59,7 @@ A custom Unix shell implementation written in C, featuring command execution, I/
 - Make build system
 - Linux/Unix operating system
 - Standard C library
+- linenoise library (included in project)
 
 ### Installation
 
@@ -128,6 +146,28 @@ osh> grep "search pattern" file.txt
 osh> echo 'single quotes work too'
 ```
 
+**Using command line editing:**
+
+```bash
+osh> ls -la
+# Press UP arrow to recall previous command
+# Press LEFT/RIGHT arrows to move cursor
+# Press Ctrl+A to jump to beginning
+# Press Ctrl+E to jump to end of line
+# Press Ctrl+L to clear screen
+```
+
+**Persistent history:**
+
+```bash
+osh> date
+osh> whoami
+osh> exit
+
+# History is saved to ~/.osh_history
+# Next time you start the shell, use UP arrow to see previous commands
+```
+
 ### I/O Redirection
 
 **Output redirection:**
@@ -193,6 +233,16 @@ osh> !!
 Running command: ls -la
 ```
 
+**Navigate command history:**
+
+```bash
+osh> pwd
+osh> date
+osh> whoami
+# Press UP arrow three times to go back through history
+# Press DOWN arrow to move forward through history
+```
+
 ### Built-in Commands
 
 **Exit the shell:**
@@ -256,13 +306,13 @@ osh> cat large_file.txt | sort | uniq -c | sort -rn > word_frequency.txt
 
 3. **Argument Count**: Maximum of 80 arguments per command (MAXLINE)
 
-4. **History**: Only the last command is stored (no full history navigation)
+4. **History Size**: Maximum of 500 commands stored (MAX_HISTORY_LEN)
 
 5. **No Job Control**:
    - Cannot bring background processes to foreground
    - No `jobs`, `fg`, or `bg` commands
 
-6. **Signal Handling**: Limited signal handling (Ctrl+C will exit the shell)
+6. **Signal Handling**: Limited signal handling for background processes
 
 7. **Environment Variables**:
    - No variable expansion (`$HOME`, `$PATH`, etc.)
@@ -280,11 +330,13 @@ osh> cat large_file.txt | sort | uniq -c | sort -rn > word_frequency.txt
 
 - `echo "She said 'hello'"` may not work as expected
 
+13. **Tab Completion**: No auto-completion for commands or file paths
+
 ### Known Issues
 
-- Empty input (just pressing Enter) shows an error message
 - No error recovery for malformed pipe chains
 - Background process completion is not reported
+- History file is only saved on clean exit (not on crash/kill)
 
 ## Project Structure
 
@@ -293,8 +345,11 @@ OS_Projects/chapter3/UNIX_Shell/
 ├── bin/              # Compiled executable
 │   └── shell
 ├── obj/              # Object files
+│   ├── linenoise.o
 │   ├── main.o
 │   └── shell.o
+├── linenoise.c       # Line editing library
+├── linenoise.h       # Line editing header
 ├── main.c            # Entry point and main loop
 ├── shell.c           # Core shell functionality
 ├── shell.h           # Header file with declarations
@@ -304,9 +359,10 @@ OS_Projects/chapter3/UNIX_Shell/
 
 ### File Descriptions
 
-- **main.c**: Contains the main loop, handles user input, and manages the shell prompt
+- **main.c**: Contains the main loop, handles user input, manages history and prompt
 - **shell.c**: Implements tokenization, parsing, and command execution
 - **shell.h**: Defines the Command structure and function prototypes
+- **linenoise.c/h**: Minimal readline replacement for command line editing
 - **Makefile**: Automated build system with multiple targets
 
 ## Technical Details
@@ -348,6 +404,20 @@ Debug output includes:
 - Pipe information
 - Command arrays for piped commands
 
+### History Management
+
+History is automatically saved to `~/.osh_history` when the shell exits cleanly.
+
+```bash
+# View your history
+cat ~/.osh_history
+
+# Clear history
+make clean-history
+# or
+rm ~/.osh_history
+```
+
 ## Contributing
 
 This is an educational project. Improvements and bug fixes are welcome.
@@ -367,8 +437,19 @@ This project is created for educational purposes as part of an Operating Systems
 
 Created as part of Chapter 3 exercises - UNIX Shell implementation.
 
-## Acknowledgments
+## Credits and Acknowledgments
+
+### Libraries Used
+
+- **linenoise** - Minimal readline replacement for line editing
+  - Author: Salvatore Sanfilippo (antirez)
+  - License: BSD 2-Clause
+  - GitHub: https://github.com/antirez/linenoise
+  - Used for command line editing and history management
+
+### Acknowledgments
 
 - Based on concepts from Operating Systems textbooks
 - Implements standard UNIX shell features
 - Uses POSIX system calls for process and I/O management
+- Command line editing powered by linenoise library

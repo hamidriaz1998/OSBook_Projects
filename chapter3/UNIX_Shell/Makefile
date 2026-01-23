@@ -1,6 +1,6 @@
 # Compiler and flags
 CC = gcc
-CFLAGS = -Wall -Wextra -std=c99
+CFLAGS = -Wall -Wextra -std=gnu99
 DEBUG_FLAGS = -DDEBUG -g
 RELEASE_FLAGS = -O2
 
@@ -12,11 +12,11 @@ BIN_DIR = bin
 TARGET = $(BIN_DIR)/shell
 
 # Source files
-SRCS = main.c shell.c
+SRCS = linenoise.c main.c shell.c
 OBJS = $(SRCS:%.c=$(OBJ_DIR)/%.o)
 
 # Header files
-HEADERS = shell.h
+HEADERS = shell.h linenoise.h
 
 # Default target
 all: $(TARGET)
@@ -52,6 +52,10 @@ clean:
 distclean: clean
 	rm -f *.txt a.out
 
+# Clean history file
+clean-history:
+	rm -f ~/.osh_history
+
 # Run the shell
 run: $(TARGET)
 	./$(TARGET)
@@ -84,6 +88,7 @@ help:
 	@echo "  rebuild    - Clean and rebuild"
 	@echo "  install    - Install to /usr/local/bin (requires root)"
 	@echo "  uninstall  - Remove from /usr/local/bin (requires root)"
-	@echo "  help       - Show this help message"
+	@echo "  help         - Show this help message"
+	@echo "  clean-history - Remove shell history file"
 
-.PHONY: all debug release clean distclean run run-debug rebuild install uninstall help
+.PHONY: all debug release clean distclean run run-debug rebuild install uninstall help clean-history
