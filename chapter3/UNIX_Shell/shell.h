@@ -1,3 +1,6 @@
+#ifndef SHELL_H
+#define SHELL_H
+
 #include <fcntl.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -36,3 +39,5 @@ int tokenize_input(struct Command *cmd);
 int parse_input(struct Command *cmd);
 int execute_command(struct Command *cmd);
 void reset_command(struct Command *cmd);
+
+#endif // SHELL_H
