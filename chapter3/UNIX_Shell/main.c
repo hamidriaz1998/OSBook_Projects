@@ -9,8 +9,8 @@ int main() {
     printf("osh> ");
     fflush(stdout);
     if (fgets(cmd.input_buf, sizeof(cmd.input_buf), stdin) == NULL) {
-      printf("Error: Invalid Input");
-      continue;
+      // EOF or error - exit shell
+      break;
     } else {
       size_t length = strlen(cmd.input_buf);
       // Check for empty input

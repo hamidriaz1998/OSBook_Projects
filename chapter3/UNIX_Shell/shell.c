@@ -30,15 +30,54 @@ void debug_command(struct Command *cmd) {
 #endif
 
 int tokenize_input(struct Command *cmd) {
-  char *token;
-  token = strtok(cmd->input_buf, " ");
   int i = 0;
-  while (token != NULL) {
+  int pos = 0;
+  char *str = cmd->input_buf;
+
+  while (str[pos] != '\0') {
+    // Skip leading spaces
+    while (str[pos] == ' ')
+      pos++;
+    if (str[pos] == '\0')
+      break;
+
+    int start = pos;
+
+    // Check if this token starts with a quote
+    if (str[pos] == '"' || str[pos] == '\'') {
+      char quote = str[pos];
+      pos++; // Skip opening quote
+      start = pos;
+
+      // Find closing quote
+      while (str[pos] != '\0' && str[pos] != quote)
+        pos++;
+
+      if (str[pos] != quote) {
+        printf("Error: Unclosed quote\n");
+        return -1;
+      }
+
+      str[pos] = '\0'; // Replace closing quote with null
+      cmd->args[i++] = &str[start];
 #ifdef DEBUG
-    printf("DEBUG: Token: %s\n", token);
+      printf("DEBUG: Token: %s\n", &str[start]);
 #endif
-    cmd->args[i++] = token;
-    token = strtok(NULL, " ");
+      pos++;
+    } else {
+      // Regular token - find next space
+      while (str[pos] != '\0' && str[pos] != ' ')
+        pos++;
+
+      if (str[pos] == ' ') {
+        str[pos] = '\0';
+        pos++;
+      }
+      cmd->args[i++] = &str[start];
+#ifdef DEBUG
+      printf("DEBUG: Token: %s\n", &str[start]);
+#endif
+    }
   }
 
   cmd->args[i] = NULL;

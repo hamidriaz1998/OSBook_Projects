@@ -10,7 +10,7 @@
 #include <unistd.h>
 
 #define MAXLINE 80
-#define BUFFER_LENGTH 256
+#define BUFFER_LENGTH 1024
 
 struct Command {
   ////////// INPUT //////////

@@ -31,6 +31,7 @@ A custom Unix shell implementation written in C, featuring command execution, I/
 
 - Multiple pipe support (e.g., `cmd1 | cmd2 | cmd3`)
 - Combined I/O redirection with pipes
+- Quoted string support (single and double quotes)
 - Debug mode for development and troubleshooting
 
 ## Setup
@@ -116,6 +117,15 @@ osh> echo hello world
 osh> ls -la
 osh> grep pattern file.txt
 osh> cat file1.txt file2.txt
+```
+
+**Commands with quoted strings:**
+
+```bash
+osh> echo "hello world"
+osh> echo "hello world" "another string"
+osh> grep "search pattern" file.txt
+osh> echo 'single quotes work too'
 ```
 
 ### I/O Redirection
@@ -238,37 +248,37 @@ osh> cat large_file.txt | sort | uniq -c | sort -rn > word_frequency.txt
 
 ### Current Limitations
 
-1. **Quote Handling**: Spaces within quotes are not handled specially
-   - `echo "hello world"` will be treated as two separate arguments
-   - Workaround: Use escape characters or avoid spaces in single arguments
-
-2. **Redirect Position**: No validation for redirect position in pipes
+1. **Redirect Position**: No validation for redirect position in pipes
    - `ls | cat > file.txt | grep pattern` may not work as expected
    - Best practice: Use `<` at the beginning and `>` at the end only
 
-3. **Command Length**: Maximum command length is 256 characters (BUFFER_LENGTH)
+2. **Command Length**: Maximum command length is 1024 characters (BUFFER_LENGTH)
 
-4. **Argument Count**: Maximum of 80 arguments per command (MAXLINE)
+3. **Argument Count**: Maximum of 80 arguments per command (MAXLINE)
 
-5. **History**: Only the last command is stored (no full history navigation)
+4. **History**: Only the last command is stored (no full history navigation)
 
-6. **No Job Control**:
+5. **No Job Control**:
    - Cannot bring background processes to foreground
    - No `jobs`, `fg`, or `bg` commands
 
-7. **Signal Handling**: Limited signal handling (Ctrl+C will exit the shell)
+6. **Signal Handling**: Limited signal handling (Ctrl+C will exit the shell)
 
-8. **Environment Variables**:
+7. **Environment Variables**:
    - No variable expansion (`$HOME`, `$PATH`, etc.)
    - No variable assignment
 
-9. **Wildcards**: No globbing support (`*.txt` won't expand)
+8. **Wildcards**: No globbing support (`*.txt` won't expand)
 
-10. **Command Substitution**: No support for `$(command)` or backticks
+9. **Command Substitution**: No support for `$(command)` or backticks
 
-11. **Logical Operators**: No support for `&&`, `||`, or `;`
+10. **Logical Operators**: No support for `&&`, `||`, or `;`
 
-12. **Redirection Append**: Only truncate mode (`>`), no append mode (`>>`)
+11. **Redirection Append**: Only truncate mode (`>`), no append mode (`>>`)
+
+12. **Nested Quotes**: Mixing quote types in complex ways is not supported
+
+- `echo "She said 'hello'"` may not work as expected
 
 ### Known Issues
 
