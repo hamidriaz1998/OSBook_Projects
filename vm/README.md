@@ -301,3 +301,152 @@ grep ttyS0 /etc/inittab
 # Should show: ttyS0::respawn:/sbin/getty -n -l /root/init.sh ttyS0 115200 vt100
 poweroff
 ```
+
+---
+
+## IDE Integration
+
+You can configure your editor to run kernel modules in the VM with a single keystroke.
+
+### Zed
+
+Create `.zed/tasks.json` in your project root:
+
+```json
+[
+  {
+    "label": "Run Current Module in VM",
+    "command": "$ZED_WORKTREE_ROOT/vm/run.sh $ZED_DIRNAME $ZED_STEM",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "reveal_target": "center",
+    "hide": "never",
+    "shell": "system",
+    "show_summary": true,
+    "show_command": true
+  },
+  {
+    "label": "Generate compile_commands.json",
+    "command": "bear -- make -C /lib/modules/$(uname -r)/build M=$ZED_DIRNAME",
+    "use_new_terminal": false,
+    "allow_concurrent_runs": false,
+    "reveal": "always",
+    "shell": "system"
+  }
+]
+```
+
+**Usage**: Open a `.c` file, press `Alt+T`, select "Run Current Module in VM".
+
+**Variables**:
+- `$ZED_WORKTREE_ROOT` - Project root directory
+- `$ZED_DIRNAME` - Directory of the current file
+- `$ZED_STEM` - Filename without extension (e.g., `time_elapsed` from `time_elapsed.c`)
+
+### VS Code
+
+Create `.vscode/tasks.json` in your project root:
+
+```json
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Run Current Module in VM",
+      "type": "shell",
+      "command": "${workspaceFolder}/vm/run.sh",
+      "args": [
+        "${fileDirname}",
+        "${fileBasenameNoExtension}"
+      ],
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Generate compile_commands.json",
+      "type": "shell",
+      "command": "bear",
+      "args": [
+        "--",
+        "make",
+        "-C",
+        "/lib/modules/${command:shellCommand.uname}/build",
+        "M=${fileDirname}"
+      ],
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "Open VM Shell",
+      "type": "shell",
+      "command": "${workspaceFolder}/vm/shell.sh",
+      "group": "build",
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated",
+        "focus": true
+      },
+      "problemMatcher": []
+    }
+  ]
+}
+```
+
+**Usage**: Open a `.c` file, press `Ctrl+Shift+B` (or `Cmd+Shift+B` on macOS), select "Run Current Module in VM".
+
+**Tip**: Add a keybinding for quick access. In `keybindings.json`:
+
+```json
+{
+  "key": "alt+t",
+  "command": "workbench.action.tasks.runTask",
+  "args": "Run Current Module in VM"
+}
+```
+
+**Variables**:
+- `${workspaceFolder}` - Project root directory
+- `${fileDirname}` - Directory of the current file
+- `${fileBasenameNoExtension}` - Filename without extension
+
+### Neovim
+
+Add to your config (e.g., `init.lua` or a keymap file):
+
+```lua
+-- Run current module in VM
+vim.keymap.set('n', '<leader>rv', function()
+  local file = vim.fn.expand('%:p')       -- Full path to current file
+  local dir = vim.fn.expand('%:p:h')      -- Directory of current file
+  local name = vim.fn.expand('%:t:r')     -- Filename without extension
+  local root = vim.fn.getcwd()            -- Project root
+  
+  vim.cmd('terminal ' .. root .. '/vm/run.sh ' .. dir .. ' ' .. name)
+end, { desc = 'Run module in VM' })
+
+-- Generate compile_commands.json
+vim.keymap.set('n', '<leader>cc', function()
+  local dir = vim.fn.expand('%:p:h')
+  vim.cmd('!bear -- make -C /lib/modules/$(uname -r)/build M=' .. dir)
+end, { desc = 'Generate compile_commands.json' })
+```
+
+**Usage**: Open a `.c` file, press `<leader>rv` to run in VM.
+
+### CLion / Other JetBrains IDEs
+
+1. Go to **Run > Edit Configurations**
+2. Click **+** and select **Shell Script**
+3. Configure:
+   - **Name**: Run Module in VM
+   - **Script path**: `$ProjectFileDir$/vm/run.sh`
+   - **Script options**: `$FileDir$ $FileNameWithoutExtension$`
+   - **Working directory**: `$ProjectFileDir$`
+
+**Usage**: Open a `.c` file, select the configuration from the dropdown, click Run (or press `Shift+F10`).

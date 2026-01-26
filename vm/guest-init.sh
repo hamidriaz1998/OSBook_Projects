@@ -40,7 +40,7 @@ get_module_name() {
     if [ ! -d "$MOUNT_POINT" ]; then
         mkdir -p "$MOUNT_POINT"
     fi
-    
+
     # Try to mount 9p share
     if mount -t 9p -o trans=virtio,version=9p2000.L hostshare "$MOUNT_POINT" 2>/dev/null; then
         if [ -f "$MOUNT_POINT/.module_name" ]; then
@@ -49,23 +49,44 @@ get_module_name() {
     fi
 }
 
-# Check if rebuild is needed (any .c file newer than .ko)
+# Check if rebuild is needed
+# Returns 0 (true) if rebuild needed, 1 (false) otherwise
 needs_rebuild() {
     local ko_file="$1"
-    
+
     # If .ko doesn't exist, need to build
     if [ ! -f "$ko_file" ]; then
         return 0
     fi
-    
+
+    # Check if .ko was built for a different kernel version
+    # modinfo returns the vermagic which includes kernel version
+    local ko_version
+    ko_version=$(modinfo -F vermagic "$ko_file" 2>/dev/null | awk '{print $1}')
+    local running_version
+    running_version=$(uname -r)
+
+    if [ "$ko_version" != "$running_version" ]; then
+        info "Module built for $ko_version, running $running_version"
+        return 0
+    fi
+
     # Check if any .c file is newer than .ko
     for c_file in *.c; do
         if [ -f "$c_file" ] && [ "$c_file" -nt "$ko_file" ]; then
             return 0
         fi
     done
-    
+
     return 1
+}
+
+# Clean only kernel build artifacts, preserving compile_commands.json and other files
+clean_build_artifacts() {
+    info "Cleaning kernel build artifacts..."
+    rm -f *.o *.ko *.mod *.mod.c *.mod.o .*.cmd .*.o.cmd 2>/dev/null
+    rm -f Module.symvers modules.order .Module.symvers.cmd .modules.order.cmd 2>/dev/null
+    rm -f .module-common.o ..module-common.o.cmd 2>/dev/null
 }
 
 # Print banner
@@ -96,39 +117,37 @@ print_help() {
 # Main
 main() {
     print_banner
-    
+
     get_module_name
-    
+
     # Check if we have a module to load (run.sh mode vs shell.sh mode)
     if [ -z "$MODULE_NAME" ]; then
         info "Shell mode - no module specified"
         info "Use 'poweroff' or Ctrl+A, X to exit"
         exec /bin/sh
     fi
-    
+
     info "Module: $MODULE_NAME"
-    
+
     # Share should already be mounted by get_module_name
     if ! mountpoint -q "$MOUNT_POINT"; then
         error "Shared folder not mounted"
         error "Make sure you're using run.sh, not shell.sh"
         exec /bin/sh
     fi
-    
+
     cd "$MOUNT_POINT" || {
         error "Failed to cd to $MOUNT_POINT"
         exec /bin/sh
     }
-    
+
     info "Working directory: $(pwd)"
-    
+
     # Smart rebuild
     KO_FILE="${MODULE_NAME}.ko"
     if needs_rebuild "$KO_FILE"; then
-        info "Source files changed, rebuilding..."
-        if ! make clean >/dev/null 2>&1; then
-            warn "make clean failed (might be first build)"
-        fi
+        info "Rebuild needed, cleaning build artifacts..."
+        clean_build_artifacts
         if make; then
             info "Build successful"
         else
@@ -139,7 +158,7 @@ main() {
     else
         info "No rebuild needed (module up to date)"
     fi
-    
+
     # Check if module file exists
     if [ ! -f "$KO_FILE" ]; then
         error "Module file not found: $KO_FILE"
@@ -147,7 +166,7 @@ main() {
         print_help
         exec /bin/sh
     fi
-    
+
     # Load module
     info "Loading module: $KO_FILE"
     if insmod "$KO_FILE"; then
@@ -156,15 +175,15 @@ main() {
         error "Failed to load module"
         warn "Check dmesg for details"
     fi
-    
+
     # Show dmesg output
     printf "\n"
     printf "${CYAN}━━━━━━━━━━━━━━━━━━━ dmesg (last 20 lines) ━━━━━━━━━━━━━━━━━━━${NC}\n"
     dmesg | tail -20
     printf "${CYAN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
-    
+
     print_help
-    
+
     # Drop to shell
     exec /bin/sh
 }
