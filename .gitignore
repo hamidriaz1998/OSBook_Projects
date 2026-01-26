@@ -56,3 +56,8 @@ dkms.conf
 *.dwo
 
 bin/
+compile_commands.json
+.cache
+
+*.iso
+*.img
